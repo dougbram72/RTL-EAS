@@ -188,7 +188,9 @@ bool parseSameHeader(const std::string& raw, SameMessage& m)
 
     if (raw.size() >= pos + 4)
     {
-        m.purgeMinutes = std::atoi(raw.substr(pos, 4).c_str());
+        // TTTT is hours + minutes (HHMM): "+0100" is one hour, not 100 minutes.
+        int t          = std::atoi(raw.substr(pos, 4).c_str());
+        m.purgeMinutes = (t / 100) * 60 + t % 100;
     }
     pos += 4;
     if (pos < raw.size() && raw[pos] == '-')
