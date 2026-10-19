@@ -94,11 +94,13 @@ SameDecoder::SameDecoder(double sampleRate, MessageCb cb) : fs_(sampleRate), cb_
         prePat_ |= (uint64_t)((0xAB >> (j % 8)) & 1) << j;
     }
     const char* sync = "ZCZC";
+    const char* eom  = "NNNN";
     for (int i = 0; i < 4; ++i)
     {
         for (int b = 0; b < 8; ++b)
         {
             zcPat_ |= (uint64_t)((sync[i] >> b) & 1) << (i * 8 + b);
+            nnPat_ |= (uint64_t)((eom[i] >> b) & 1) << (i * 8 + b);
         }
     }
 }
@@ -207,6 +209,20 @@ void SameDecoder::handleBit(int bit)
         byteVal_     = 0;
         bitInByte_   = 0;
         preambleAge_ = 1000000000;
+    }
+    else if (!collecting_ && preambleAge_ <= 200 && popcount64((uint64_t)(reg_ ^ nnPat_)) <= 2)
+    {
+        preambleAge_ = 1000000000;
+        // One callback per EOM burst: its three copies arrive within ~3 s.
+        if (samplePos_ - lastEom_ > (int64_t)(3.0 * fs_))
+        {
+            lastEom_ = samplePos_;
+            emitPending();
+            if (eomCb_)
+            {
+                eomCb_();
+            }
+        }
     }
 }
 

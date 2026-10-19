@@ -23,8 +23,13 @@ class SameDecoder
 {
 public:
     using MessageCb = std::function<void(const SameMessage&)>;
+    using EomCb     = std::function<void()>;
 
     SameDecoder(double sampleRate, MessageCb cb);
+
+    // Called once per end-of-message burst ("NNNN" after a preamble, sent three
+    // times), after any pending header has been reported.
+    void setEomCallback(EomCb cb) { eomCb_ = std::move(cb); }
 
     void push(const float* audio, int n);
 
@@ -57,6 +62,7 @@ private:
     double    spb_ = 0.0;
     double    inc_ = 0.0;
     MessageCb cb_;
+    EomCb     eomCb_;
 
     Biquad hp_, lp_;
 
@@ -72,6 +78,8 @@ private:
 
     uint64_t prePat_ = 0;
     uint64_t zcPat_  = 0;
+    uint64_t nnPat_  = 0;
+    int64_t  lastEom_ = -(int64_t)1 << 40;
     uint64_t w64_    = 0;
     uint32_t reg_    = 0;
     int      preambleAge_ = 1000000000;

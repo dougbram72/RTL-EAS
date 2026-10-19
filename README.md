@@ -103,6 +103,25 @@ Output:
 NOAA weather radio channels (MHz): `162.400 162.425 162.450 162.475 162.500
 162.525 162.550`.
 
+### Unattended service (Linux)
+
+`cmake -S . -B build -G Ninja` builds only the console `rtl-eas` off Windows
+(`-DRTLEAS_GUI=ON` for the desktop app). For a long-running receiver:
+
+```bash
+rtl-eas --device serial:00000220 --freq 162.400 --gain 20 --no-log-file \
+  --log /var/lib/rtleas/alerts.ndjson --status /var/lib/rtleas/status.json \
+  --clips /var/lib/rtleas/clips
+```
+
+- `--log` appends one JSON line per decoded header (the `--json` object plus
+  `id`, `received` and `clip`) and a `{"type":"clip",...}` line when that
+  alert's recording is finished.
+- `--status` is rewritten every 60 s with channel power (dBFS) and audio level,
+  so a reader can tell a live receiver from a dead one between alerts.
+- `--clips` saves each alert from 10 s before its header to 2 s after the
+  end-of-message (`NNNN`) burst, capped by `--clip-max` (default 300 s).
+
 ### Live decoding
 
 Tune the RTL-SDR to a local NOAA weather radio channel and let it run:

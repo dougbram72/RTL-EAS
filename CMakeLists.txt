@@ -21,13 +21,18 @@ if(NOT RTLSDR_FOUND)
 endif()
 
 find_package(Threads REQUIRED)
-find_package(OpenGL REQUIRED)
-find_package(glfw3 CONFIG QUIET)
-if(NOT glfw3_FOUND)
-    if(NOT PkgConfig_FOUND)
-        find_package(PkgConfig REQUIRED)
+
+# The desktop GUI needs OpenGL + GLFW; a headless (server) build skips it.
+option(RTLEAS_GUI "Build the rtl-eas-gui desktop app" ${WIN32})
+if(RTLEAS_GUI)
+    find_package(OpenGL REQUIRED)
+    find_package(glfw3 CONFIG QUIET)
+    if(NOT glfw3_FOUND)
+        if(NOT PkgConfig_FOUND)
+            find_package(PkgConfig REQUIRED)
+        endif()
+        pkg_check_modules(GLFW REQUIRED glfw3)
     endif()
-    pkg_check_modules(GLFW REQUIRED glfw3)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -61,8 +66,12 @@ endif()
 add_executable(rtl-eas
     src/main.cpp
     src/app/options.cpp
+    src/app/alert_service.cpp
 )
 target_link_libraries(rtl-eas PRIVATE rtleascore)
+install(TARGETS rtl-eas RUNTIME DESTINATION bin)
+
+if(RTLEAS_GUI)
 
 # ---------------------------------------------------------------------------
 # Dear ImGui (docking branch, vendored) as a static library for the GUI.
@@ -108,6 +117,8 @@ else()
     target_link_directories(rtl-eas-gui PRIVATE ${GLFW_LIBRARY_DIRS})
 endif()
 
+endif() # RTLEAS_GUI
+
 # ---------------------------------------------------------------------------
 # Windows: copy runtime DLLs next to each executable so they run standalone.
 # ---------------------------------------------------------------------------
@@ -121,7 +132,11 @@ if(WIN32)
         libusb-1.0.dll
     )
     set(RTLEAS_GUI_DLLS ${RTLEAS_RUNTIME_DLLS} glfw3.dll)
-    foreach(target rtl-eas rtl-eas-gui)
+    set(RTLEAS_TARGETS rtl-eas)
+    if(RTLEAS_GUI)
+        list(APPEND RTLEAS_TARGETS rtl-eas-gui)
+    endif()
+    foreach(target ${RTLEAS_TARGETS})
         if(target STREQUAL "rtl-eas-gui")
             set(dlls ${RTLEAS_GUI_DLLS})
         else()

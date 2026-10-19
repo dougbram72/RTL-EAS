@@ -11,6 +11,8 @@ enum class LogLevel
 };
 
 void logSetVerbose(bool on);
+// Append to ./log.txt (default on); a systemd service logs to the journal instead.
+void logSetFileEnabled(bool on);
 bool logVerbose();
 
 void logWrite(LogLevel level, const char* fmt, ...)

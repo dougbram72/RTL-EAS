@@ -8,6 +8,7 @@ struct Options
     bool list = false;
 
     int    device     = 0;
+    std::string deviceSerial; // --device serial:<sn>; resolved to `device` at start
     double freqMHz    = 162.550;
     double sampleRate = 2400000.0;
     double gainDb     = -1.0; // <0 => auto/AGC
@@ -30,6 +31,13 @@ struct Options
     bool        verbose = false;
     bool        showHelp = false;
     double      duration = 0.0; // seconds; 0 = run until Ctrl-C / EOF
+
+    // Unattended service outputs (see app/alert_service.h).
+    std::string logPath;     // --log: append one JSON line per header / finished clip
+    std::string statusPath;  // --status: receiver status JSON, rewritten every 60 s
+    std::string clipsDir;    // --clips: one WAV per alert, header to end-of-message
+    double      clipMaxSec = 300.0;
+    bool        noLogFile  = false; // --no-log-file: don't write ./log.txt
 };
 
 bool parseOptions(int argc, char** argv, Options& out, std::string& err);

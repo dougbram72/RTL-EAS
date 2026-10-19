@@ -9,6 +9,8 @@
 #include "eas/same_decoder.h"
 #include "util/wav_io.h"
 
+#include <atomic>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -29,6 +31,12 @@ public:
 
     double channelRate() const { return ddc_ ? ddc_->outputRate() : 0.0; }
 
+    // End-of-message ("NNNN") notifications from the SAME decoder, SDR thread.
+    void setEomCallback(SameDecoder::EomCb cb);
+
+    // Smoothed power of the channel after the DDC, dBFS. NaN before any input.
+    double channelPowerDb() const { return powerDb_.load(); }
+
 private:
     void ensureDdc(const float* iq, int nComplex);
     void createDdc(double offset);
@@ -38,6 +46,8 @@ private:
     double                      inputRate_ = 0.0;
     SameDecoder::MessageCb      cb_;
     std::function<void(const float*, int)> audioSink_;
+    SameDecoder::EomCb          eomCb_;
+    std::atomic<double>         powerDb_{NAN};
     std::unique_ptr<Ddc>        ddc_;
     std::unique_ptr<FmDemod>    fm_;
     std::unique_ptr<SameDecoder> dec_;

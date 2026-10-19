@@ -11,10 +11,11 @@ namespace
 std::atomic<bool> g_verbose{false};
 std::mutex        g_mtx;
 std::FILE*        g_file = nullptr;
+std::atomic<bool> g_fileEnabled{true};
 
 void ensureOpen()
 {
-    if (!g_file)
+    if (!g_file && g_fileEnabled.load())
     {
         g_file = std::fopen("log.txt", "ab");
     }
@@ -37,6 +38,11 @@ void stamp(char* buf, size_t n)
 void logSetVerbose(bool on)
 {
     g_verbose.store(on);
+}
+
+void logSetFileEnabled(bool on)
+{
+    g_fileEnabled.store(on);
 }
 
 bool logVerbose()

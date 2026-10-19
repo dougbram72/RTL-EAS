@@ -18,7 +18,7 @@ void printUsage()
         "  rtl-eas [options]\n"
         "\n"
         "Source:\n"
-        "  --device N        RTL-SDR device index (default 0)\n"
+        "  --device N        RTL-SDR device index, or serial:<sn> (default 0)\n"
         "  --freq MHZ        center frequency (default 162.550)\n"
         "  --rate HZ         sample rate (default 2400000)\n"
         "  --gain DB         tuner gain in dB, or 'auto' (default auto)\n"
@@ -35,6 +35,13 @@ void printUsage()
         "  --json            emit each message as a single JSON line\n"
         "  --verbose         verbose logging\n"
         "  --duration N      stop after N seconds (0 = run until Ctrl-C)\n"
+        "\n"
+        "Service (unattended):\n"
+        "  --log FILE        append a JSON line per decoded header and per finished clip\n"
+        "  --status FILE     rewrite receiver status JSON every 60 s\n"
+        "  --clips DIR       record each alert to DIR/<id>.wav (pre-roll to end-of-message)\n"
+        "  --clip-max N      longest clip in seconds (default 300)\n"
+        "  --no-log-file     don't append diagnostics to ./log.txt\n"
         "  --list            list RTL-SDR devices and exit\n"
         "  -h, --help        show this help\n"
         "\n"
@@ -77,7 +84,14 @@ bool parseOptions(int argc, char** argv, Options& o, std::string& err)
             {
                 return false;
             }
-            o.device = std::atoi(argv[i]);
+            if (std::strncmp(argv[i], "serial:", 7) == 0)
+            {
+                o.deviceSerial = argv[i] + 7;
+            }
+            else
+            {
+                o.device = std::atoi(argv[i]);
+            }
         }
         else if (a == "--freq")
         {
@@ -186,6 +200,33 @@ bool parseOptions(int argc, char** argv, Options& o, std::string& err)
         else if (a == "--verbose")
         {
             o.verbose = true;
+        }
+        else if (a == "--log" || a == "--status" || a == "--clips" || a == "--clip-max")
+        {
+            if (!needValue(argc, argv, i, a.c_str(), err))
+            {
+                return false;
+            }
+            if (a == "--log")
+            {
+                o.logPath = argv[i];
+            }
+            else if (a == "--status")
+            {
+                o.statusPath = argv[i];
+            }
+            else if (a == "--clips")
+            {
+                o.clipsDir = argv[i];
+            }
+            else
+            {
+                o.clipMaxSec = std::atof(argv[i]);
+            }
+        }
+        else if (a == "--no-log-file")
+        {
+            o.noLogFile = true;
         }
         else
         {

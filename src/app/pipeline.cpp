@@ -84,6 +84,15 @@ Pipeline::Pipeline(const Options& opt, double inputRate, SameDecoder::MessageCb 
     }
 }
 
+void Pipeline::setEomCallback(SameDecoder::EomCb cb)
+{
+    eomCb_ = std::move(cb);
+    if (dec_)
+    {
+        dec_->setEomCallback(eomCb_);
+    }
+}
+
 Pipeline::~Pipeline()
 {
     finish();
@@ -95,6 +104,7 @@ void Pipeline::createDdc(double offset)
     double fs = ddc_->outputRate();
     fm_       = std::make_unique<FmDemod>(fs);
     dec_      = std::make_unique<SameDecoder>(fs, cb_);
+    dec_->setEomCallback(eomCb_);
 
     logWrite(LogLevel::Info, "channel: %.0f Hz rate, %+.0f Hz offset, %.0f Hz BW", fs, offset, opt_.channelBw);
 
@@ -136,6 +146,15 @@ void Pipeline::processIq(const float* iq, int nComplex)
     {
         return;
     }
+
+    double sum = 0.0;
+    for (size_t i = 0; i < ch_.size(); ++i)
+    {
+        sum += ch_[i] * ch_[i];
+    }
+    double db   = 10.0 * std::log10(sum / nc + 1e-20);
+    double prev = powerDb_.load();
+    powerDb_.store(std::isnan(prev) ? db : prev * 0.9 + db * 0.1);
 
     audio_.clear();
     fm_->process(ch_.data(), nc, audio_);

@@ -1,4 +1,5 @@
 // rtl-eas - NOAA SAME weather radio decoder (SDR-first).
+#include "app/alert_service.h"
 #include "app/options.h"
 #include "app/pipeline.h"
 #include "eas/same_message.h"
@@ -9,6 +10,7 @@
 #include "version.h"
 
 #include <atomic>
+#include <cmath>
 #include <chrono>
 #include <csignal>
 #include <cstdio>
@@ -17,6 +19,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+#include <rtl-sdr.h>
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -80,7 +84,7 @@ int listDevices()
     return 0;
 }
 
-int runIq(const Options& opt, SameDecoder::MessageCb cb)
+int runIq(const Options& opt, SameDecoder::MessageCb cb, AlertService& svc)
 {
     std::unique_ptr<SdrSource> src;
     double                     inputRate = opt.sampleRate;
@@ -109,6 +113,11 @@ int runIq(const Options& opt, SameDecoder::MessageCb cb)
     }
 
     Pipeline pipeline(opt, inputRate, std::move(cb));
+    if (svc.enabled())
+    {
+        pipeline.setAudioSink([&svc, &pipeline](const float* a, int n) { svc.onAudio(a, n, pipeline.channelRate()); });
+        pipeline.setEomCallback([&svc]() { svc.onEom(); });
+    }
 
     src->setCenterFreq(opt.freqMHz * 1e6);
     src->setSampleRate(inputRate);
@@ -137,15 +146,23 @@ int runIq(const Options& opt, SameDecoder::MessageCb cb)
                 break;
             }
         }
+        if (svc.enabled())
+        {
+            svc.tick(pipeline.channelPowerDb());
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     src->stop();
     pipeline.finish();
+    if (svc.enabled())
+    {
+        svc.finish(pipeline.channelPowerDb());
+    }
     return 0;
 }
 
-int runAudio(const Options& opt, SameDecoder::MessageCb cb)
+int runAudio(const Options& opt, SameDecoder::MessageCb cb, AlertService& svc)
 {
     WavReader   reader;
     std::string err;
@@ -158,6 +175,10 @@ int runAudio(const Options& opt, SameDecoder::MessageCb cb)
     double fs       = (double)reader.format().sampleRate;
     int    channels = reader.format().channels;
     SameDecoder dec(fs, std::move(cb));
+    if (svc.enabled())
+    {
+        dec.setEomCallback([&svc]() { svc.onEom(); });
+    }
 
     WavWriter  rec;
     Playback   play;
@@ -201,9 +222,17 @@ int runAudio(const Options& opt, SameDecoder::MessageCb cb)
         {
             play.write(mono.data(), frames);
         }
+        if (svc.enabled())
+        {
+            svc.onAudio(mono.data(), frames, fs);
+        }
         dec.push(mono.data(), frames);
     }
     dec.flush();
+    if (svc.enabled())
+    {
+        svc.finish(NAN);
+    }
     rec.close();
     play.close();
     return 0;
@@ -228,6 +257,7 @@ int main(int argc, char** argv)
     }
 
     logSetVerbose(opt.verbose);
+    logSetFileEnabled(!opt.noLogFile);
     installSignals();
 
     if (opt.list)
@@ -235,11 +265,29 @@ int main(int argc, char** argv)
         return listDevices();
     }
 
-    SameDecoder::MessageCb cb = [&opt](const SameMessage& m) { reportMessage(opt, m); };
+    if (!opt.deviceSerial.empty() && opt.wav.empty() && opt.audio.empty())
+    {
+        int idx = rtlsdr_get_index_by_serial(opt.deviceSerial.c_str());
+        if (idx < 0)
+        {
+            std::fprintf(stderr, "error: no RTL-SDR with serial %s\n", opt.deviceSerial.c_str());
+            return 1;
+        }
+        opt.device = idx;
+    }
+
+    AlertService           svc(opt);
+    SameDecoder::MessageCb cb = [&opt, &svc](const SameMessage& m) {
+        reportMessage(opt, m);
+        if (svc.enabled())
+        {
+            svc.onMessage(m);
+        }
+    };
 
     if (!opt.audio.empty())
     {
-        return runAudio(opt, std::move(cb));
+        return runAudio(opt, std::move(cb), svc);
     }
-    return runIq(opt, std::move(cb));
+    return runIq(opt, std::move(cb), svc);
 }
