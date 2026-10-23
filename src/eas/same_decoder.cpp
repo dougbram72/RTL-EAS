@@ -10,6 +10,10 @@ constexpr double kMarkHz  = 2083.3333;
 constexpr double kSpaceHz = 1562.5;
 constexpr double kBaud    = 520.8333;
 
+// Copies of one header (sent three times) closer than this are grouped. NWR
+// has been heard with copies ~3 s apart end to end, past the old 2.5 s.
+constexpr double kGroupSec = 6.0;
+
 constexpr double kHpHz = 900.0;
 constexpr double kLpHz = 2700.0;
 
@@ -162,7 +166,7 @@ void SameDecoder::push(const float* audio, int n)
         lastSgn_ = sgn;
     }
 
-    if (!pendingKey_.empty() && samplePos_ - pendingLast_ > (int64_t)(2.5 * fs_))
+    if (!pendingKey_.empty() && samplePos_ - pendingLast_ > (int64_t)(kGroupSec * fs_))
     {
         emitPending();
     }
@@ -241,7 +245,7 @@ void SameDecoder::finishHeader()
     }
 
     std::string key = sameCanonicalKey(m);
-    if (!pendingKey_.empty() && key == pendingKey_ && samplePos_ - pendingLast_ < (int64_t)(2.5 * fs_))
+    if (!pendingKey_.empty() && key == pendingKey_ && samplePos_ - pendingLast_ < (int64_t)(kGroupSec * fs_))
     {
         ++pendingRepeats_;
         pendingLast_ = samplePos_;

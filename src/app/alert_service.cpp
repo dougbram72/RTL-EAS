@@ -12,7 +12,7 @@
 namespace
 {
 
-constexpr double kPrerollSec = 10.0; // covers the three headers + the decoder's 2.5 s grouping delay
+constexpr double kPrerollSec = 20.0; // covers the three headers (~10 s) + the decoder's 6 s grouping delay
 constexpr double kEomTailSec = 2.0;
 constexpr int    kStatusSec  = 60;
 

@@ -119,7 +119,7 @@ rtl-eas --device serial:00000220 --freq 162.400 --gain 20 --no-log-file \
   alert's recording is finished.
 - `--status` is rewritten every 60 s with channel power (dBFS) and audio level,
   so a reader can tell a live receiver from a dead one between alerts.
-- `--clips` saves each alert from 10 s before its header to 2 s after the
+- `--clips` saves each alert from 20 s before it is reported (covering its three headers) to 2 s after the
   end-of-message (`NNNN`) burst, capped by `--clip-max` (default 300 s).
 
 ### Live decoding
